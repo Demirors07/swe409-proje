@@ -1,1 +1,0 @@
-# veriyi PNG piksellerinin içine görünmez bir şekilde nakşedeceğimiz Steganografi Çekirdeği
