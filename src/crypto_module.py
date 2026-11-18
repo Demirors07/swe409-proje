@@ -6,62 +6,56 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives import hashes
 
-def encrypt_aes_gcm(plaintext: bytes, key: bytes, header_bytes: bytes) -> tuple[bytes, bytes]:
-    """
-    AES-256-GCM ile şifreleme yapar.
-    - key: 32 baytlık AES anahtarı
-    - plaintext: şifrelenecek ham veri (bytes)
-    - header_bytes: AAD (Additional Authenticated Data) olarak kullanılacak header
-    Döner: (nonce, ciphertext_with_tag)
-    """
-    aesgcm = AESGCM(key)
-    nonce = os.urandom(12)  # Her şifrelemede taze 12 baytlık rastgele nonce
-    
-    # AESGCM.encrypt otomatik olarak ciphertext ile tag'i birleştirip döndürür
-    ciphertext_with_tag = aesgcm.encrypt(nonce, plaintext, header_bytes)
-    return nonce, ciphertext_with_tag
-
-
-def decrypt_aes_gcm(ciphertext_with_tag: bytes, key: bytes, nonce: bytes, header_bytes: bytes) -> bytes:
-    """
-    AES-256-GCM ile şifre çözme yapar.
-    - ciphertext_with_tag: Şifreli metin + 16 baytlık tag
-    - key: 32 baytlık AES anahtarı
-    - nonce: Şifrelemede kullanılan 12 baytlık nonce
-    - header_bytes: AAD olarak doğrulanacak header
-    Döner: Ham plaintext baytları
-    """
-    aesgcm = AESGCM(key)
-    # Tag uyuşmazlığı veya bozulma durumunda cryptography.exceptions.InvalidTag fırlatır
-    plaintext = aesgcm.decrypt(nonce, ciphertext_with_tag, header_bytes)
-    return plaintext
-
-
-def derive_key_from_password(password: str, salt: bytes = None) -> tuple[bytes, bytes]:
-    """
-    Paroladan Argon2id kullanarak 32 baytlık AES anahtarı türetir.
-    - salt verilmezse 16 baytlık taze salt üretilir.
-    Döner: (derived_key, salt)
-    """
-    if salt is None:
-        salt = os.urandom(16)  # Her şifrelemede taze 16 baytlık salt
-        
-    argon2 = Argon2id(
+def derive_key(password: str, salt: bytes) -> bytes:
+    """Argon2id ile paroladan 32 baytlık AES anahtarı türetir."""
+    kdf = Argon2id(
         salt=salt,
-        length=32,          # AES-256 için 32 bayt
-        iterations=2,       # Zaman maliyeti
-        lanes=4,            # Paralellik
-        memory_cost=65536   # Bellek maliyeti (64 MB)
+        length=32,
+        iterations=2,
+        lanes=1,
+        memory_cost=65536,
     )
-    key = argon2.derive(password.encode('utf-8'))
-    return key, salt
+    return kdf.derive(password.encode('utf-8'))
 
 
-def generate_rsa_keypair():
+
+class EmptyMessageError(ValueError):
+    """Şifrelenecek mesaj boş olduğunda fırlatılır."""
+    pass
+
+def validate_plaintext(plaintext: bytes):
+    if not plaintext or len(plaintext.strip()) == 0:
+        raise EmptyMessageError("Şifrelenecek veya gizlenecek mesaj boş olamaz.")
+
+def encrypt_aes_gcm(plaintext: bytes, password: str, aad: bytes = None) -> tuple[bytes, bytes, bytes]:
     """
-    2048-bit RSA anahtar çifti üretir.
-    Döner: (private_key, public_key)
+    Rastgele salt ve nonce üretir. Argon2id ile anahtar türetir.
+    AES-256-GCM ile şifreler (Header'ı AAD olarak korumaya alır).
+    Dönüş: (ciphertext_plus_tag, nonce, salt)
     """
+    validate_plaintext(plaintext)  # <--- İşte bu eksikti
+    
+    salt = os.urandom(16)
+    nonce = os.urandom(12)
+    key = derive_key(password, salt)
+    
+    aesgcm = AESGCM(key)
+    ciphertext_and_tag = aesgcm.encrypt(nonce, plaintext, aad)
+    return ciphertext_and_tag, nonce, salt
+
+
+def decrypt_aes_gcm(ciphertext_and_tag: bytes, password: str, nonce: bytes, salt: bytes, aad: bytes = None) -> bytes:
+    """
+    Argon2id ile anahtarı yeniden türetir.
+    AES-256-GCM ile çözer ve AAD (Header) bütünlüğünü doğrular.
+    """
+    key = derive_key(password, salt)
+    aesgcm = AESGCM(key)
+    return aesgcm.decrypt(nonce, ciphertext_and_tag, aad)
+
+
+def generate_rsa_keys():
+    """2048-bit RSA anahtar çifti üretir."""
     private_key = rsa.generate_private_key(
         public_exponent=65537,
         key_size=2048
@@ -69,14 +63,9 @@ def generate_rsa_keypair():
     public_key = private_key.public_key()
     return private_key, public_key
 
-
-
 def wrap_aes_key(aes_key: bytes, public_key) -> bytes:
-    """
-    32 baytlık AES anahtarını RSA-OAEP (SHA-256) ile sarmalar.
-    Döner: 256 baytlık sarmalanmış anahtar (wrapped_key).
-    """
-    wrapped_key = public_key.encrypt(
+    """Rastgele 32 baytlık AES anahtarını RSA-OAEP-SHA256 ile sarar (256 bayt)."""
+    return public_key.encrypt(
         aes_key,
         padding.OAEP(
             mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -84,15 +73,10 @@ def wrap_aes_key(aes_key: bytes, public_key) -> bytes:
             label=None
         )
     )
-    return wrapped_key
-
 
 def unwrap_aes_key(wrapped_key: bytes, private_key) -> bytes:
-    """
-    RSA-OAEP (SHA-256) ile sarmalanmış AES anahtarını özel anahtar (private key) ile çözer.
-    Döner: 32 baytlık orijinal AES anahtarı.
-    """
-    aes_key = private_key.decrypt(
+    """Sarılmış AES anahtarını RSA özel anahtarı ile çözer."""
+    return private_key.decrypt(
         wrapped_key,
         padding.OAEP(
             mgf=padding.MGF1(algorithm=hashes.SHA256()),
@@ -100,4 +84,39 @@ def unwrap_aes_key(wrapped_key: bytes, private_key) -> bytes:
             label=None
         )
     )
-    return aes_key
+
+
+def save_private_key(private_key, filepath: str, password: str = None):
+    """Özel anahtarı PEM formatında kaydeder. İsteğe bağlı parola ile şifreler."""
+    encryption = (
+        serialization.BestAvailableEncryption(password.encode()) 
+        if password else serialization.NoEncryption()
+    )
+    pem = private_key.private_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PrivateFormat.PKCS8,
+        encryption_algorithm=encryption
+    )
+    with open(filepath, "wb") as f:
+        f.write(pem)
+
+def load_private_key(filepath: str, password: str = None):
+    """PEM formatındaki özel anahtarı dosyadan okur."""
+    with open(filepath, "rb") as f:
+        pem_data = f.read()
+    return serialization.load_pem_private_key(pem_data, password=password.encode() if password else None)
+
+def save_public_key(public_key, filepath: str):
+    """Genel anahtarı PEM formatında kaydeder."""
+    pem = public_key.public_bytes(
+        encoding=serialization.Encoding.PEM,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo
+    )
+    with open(filepath, "wb") as f:
+        f.write(pem)
+
+def load_public_key(filepath: str):
+    """PEM formatındaki genel anahtarı dosyadan okur."""
+    with open(filepath, "rb") as f:
+        pem_data = f.read()
+    return serialization.load_pem_public_key(pem_data)
