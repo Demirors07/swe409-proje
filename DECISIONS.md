@@ -48,7 +48,7 @@ tarih + gerekçe ile eklenir.
 - A — Header her zaman k=1 ile gömülür; `extract --bits` yok. Payload
   header'daki k ile.
 - B — Header, AES-GCM'e AAD olarak verilir.
-- C — KDF: `cryptography` içindeki Scrypt; parametreler kodda sabit ve
+- C — KDF: `cryptography` içindeki Argon2id; parametreler kodda sabit ve
   `version` alanına bağlı. OWASP güncel değerleri Adım 1'de belgelenir.
 - D — Boş mesaj açık hatayla reddedilir; test edilir.
 - E — Girdi RGB'ye çevrilir, çıktı her zaman PNG. Alfa davranışı Adım 1'de
@@ -56,7 +56,7 @@ tarih + gerekçe ile eklenir.
 - F — PRNG'li dağınık gömme ertelendi (zaman kalırsa Adım 7 sonrası).
 
 ## Adım 1'de kilitlenecekler (yol haritası gereği ertelendi)
-- Bit sırası: MSB-first veya LSB-first (öneri: MSB-first)
+- Bit sırası: MSB-first (kilitlendi)
 - Gömme sırası: satır satır, soldan sağa, üstten alta, R→G→B
 
 ---
@@ -71,3 +71,27 @@ tarih + gerekçe ile eklenir.
 | 2026-11-17  | Repo adı `swe409-proje` olarak kilitlendi          | Ders koduyla uyumlu, değiştirmek gereksiz |
 | 2026-11-17  | Commit dili İngilizceye çevrildi                   | Rapor İngilizce, tutarlılık              |
 | 2026-11-17  | Ek B mesajı Adım 9'da gönderilecek                 | Kullanıcı plana sadık kalma tercihi      |
+
+
+
+## Adım 1: Tasarım ve Metodoloji — TAMAMLANDI
+* **Dokümantasyon:** Tüm teknik tasarım kararları ve sistem mimarisi `docs/design.md` dosyasına işlendi.
+* **Header Şeması:** AES modu için **40 bayt**, RSA hibrit modu için **280 bayt** sabit boyutlu yapı (`magic="STG1"`, `version`, `mode`, `k`, `reserved`, `nonce`, `ct_len`, `salt`/`wrapped_key`) onaylandı.
+* **Kapasite Formülü:** Header'ın her zaman **$k = 1$** ile gömülmesi esasına dayalı $\text{MaxPayloadBytes} = \lfloor (((W \times H \times 3) - (H_{\text{bytes}} \times 8)) \times k) / 8 \rfloor$ formülü kesinleştirildi.
+* **Hata Yönetimi:** `EmptyMessageError`, `CapacityError`, `InvalidHeader` ve `DecryptionError` olmak üzere 4 temel hata türü tanımlandı.
+* **Veri Akışları:** Tek aşamalı gömme (`embed`) ve iki aşamalı okuma/doğrulama (`extract`) akış mantığı netleştirildi.
+* **Sıradaki Adım:** Adım 2 (Proje klasör iskeletinin oluşturulması ve çekirdek modüllerin kodlanması).
+
+
+
+
+
+
+
+
+
+
+
+
+
+
