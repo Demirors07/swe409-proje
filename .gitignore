@@ -1,9 +1,50 @@
+# Python bayt kodları ve önbellekler
 __pycache__/
 *.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Sanal ortamlar (Virtual Environment)
 .venv/
 venv/
+ENV/
+env/
+
+# IDE ve Editör ayarları (VS Code, PyCharm vb.)
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Hassas Kriptografik Dosyalar ve Anahtarlar (ASLA GİTMEMELİ!)
 *.pem
 *.key
-.env
+private_key.pem
+secret/
+keys/
+
+# Geçici Çıktılar, Test Görselleri ve Loglar
+samples/output_*.png
+samples/*_stego.png
+output/
+outputs/
+*.log
 .DS_Store
-results/tmp/
