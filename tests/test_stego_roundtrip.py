@@ -74,3 +74,42 @@ def test_rgb_loader_composites_transparency_on_white(
 
     assert rgb.shape == (24, 32, 3)
     np.testing.assert_array_equal(rgb, expected)
+
+
+@pytest.mark.parametrize("image_mode", ["L", "P"])
+def test_grayscale_and_palette_png_roundtrip(
+    tmp_path: Path,
+    image_mode: str,
+) -> None:
+    if image_mode == "L":
+        image = Image.fromarray(
+            np.full((72, 80), 127, dtype=np.uint8),
+            mode="L",
+        )
+    else:
+        indices = np.tile(np.arange(3, dtype=np.uint8), (72, 27))[:, :80]
+        image = Image.fromarray(indices, mode="P")
+        image.putpalette(
+            [12, 34, 56, 78, 90, 123, 210, 180, 150] + [0] * (768 - 9)
+        )
+
+    cover_path = tmp_path / f"cover_{image_mode}.png"
+    output_path = tmp_path / f"stego_{image_mode}.png"
+    image.save(cover_path)
+    with Image.open(cover_path) as saved_image:
+        expected_rgb = np.asarray(saved_image.convert("RGB"))
+
+    rgb = load_rgb_array(cover_path)
+    np.testing.assert_array_equal(rgb, expected_rgb)
+    payload = f"round-trip from {image_mode} image".encode()
+    embed_message(
+        cover_path,
+        output_path,
+        payload,
+        mode=0x01,
+        k=2,
+        nonce=b"123456789012",
+        extra_data=b"0123456789abcdef",
+    )
+
+    assert extract_message_from_image(output_path)[0] == payload

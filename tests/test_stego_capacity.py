@@ -63,3 +63,23 @@ def test_capacity_is_independent_of_rgb_or_rgba_storage(
     for mode in (0x01, 0x02):
         for k in (1, 2, 3):
             assert capacity(rgb_path, mode, k) == capacity(rgba_path, mode, k)
+
+
+@pytest.mark.parametrize("k", [0, 4])
+def test_embed_rejects_unsupported_wire_k(
+    tmp_path: Path,
+    create_cover: Callable[[int, int, str], Path],
+    k: int,
+) -> None:
+    cover_path = create_cover(64, 64)
+
+    with pytest.raises(ValueError, match="k must be between 1 and 3"):
+        embed_message(
+            cover_path,
+            tmp_path / f"unsupported_k{k}.png",
+            b"payload",
+            mode=0x01,
+            k=k,
+            nonce=b"123456789012",
+            extra_data=b"0123456789abcdef",
+        )

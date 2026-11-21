@@ -358,6 +358,85 @@ def test_embed_rejects_empty_or_whitespace_message(
     assert "boş olamaz" in capsys.readouterr().err
 
 
+@pytest.fixture(scope="module")
+def rsa_key_pair():
+    return generate_rsa_keys()
+
+
+@pytest.mark.parametrize(("mode", "mode_id"), [("aes", 0x01), ("rsa", 0x02)])
+@pytest.mark.parametrize("bits", [1, 2, 3])
+@pytest.mark.parametrize(("width", "height"), [(96, 80), (128, 96)])
+@pytest.mark.parametrize(
+    ("message_name", "original"),
+    [
+        ("short", "Hi!".encode()),
+        ("normal", "This is a normal message for a CLI round-trip.".encode()),
+        ("long", ("Long message content. " * 96).encode()),
+        ("unicode", "Merhaba, dünya! Şifreleme ve gizleme: ğüşİöç.".encode()),
+    ],
+)
+def test_cli_encryption_roundtrip_matrix(
+    tmp_path,
+    monkeypatch: pytest.MonkeyPatch,
+    create_cover,
+    rsa_key_pair,
+    mode: str,
+    mode_id: int,
+    bits: int,
+    width: int,
+    height: int,
+    message_name: str,
+    original: bytes,
+) -> None:
+    image_path = create_cover(width, height)
+    message_path = tmp_path / f"{message_name}.txt"
+    stego_path = tmp_path / "stego.png"
+    output_path = tmp_path / "recovered.txt"
+    message_path.write_bytes(original)
+    command = [
+        "embed",
+        str(image_path),
+        str(message_path),
+        "--output",
+        str(stego_path),
+        "--mode",
+        mode,
+        "--k",
+        str(bits),
+    ]
+
+    if mode == "aes":
+        monkeypatch.setattr("main.getpass", lambda _prompt: "matrix passphrase")
+    else:
+        private_key, public_key = rsa_key_pair
+        private_key_path = tmp_path / "private.pem"
+        public_key_path = tmp_path / "public.pem"
+        save_private_key(private_key, str(private_key_path))
+        save_public_key(public_key, str(public_key_path))
+        command.extend(["--pubkey", str(public_key_path)])
+
+    main(command)
+    extract_command = [
+        "extract",
+        str(stego_path),
+        "--output",
+        str(output_path),
+    ]
+    if mode == "rsa":
+        extract_command.extend(["--privkey", str(private_key_path)])
+
+    recovered = main(extract_command)
+
+    assert recovered == original
+    assert output_path.read_bytes() == original
+    extracted_payload, extracted_mode, extracted_bits, _, _ = extract_message_from_image(
+        stego_path
+    )
+    assert extracted_mode == mode_id
+    assert extracted_bits == bits
+    assert extracted_payload
+
+
 def test_embed_rsa_requires_public_key(
     tmp_path, capsys: pytest.CaptureFixture[str]
 ) -> None:

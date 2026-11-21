@@ -182,3 +182,21 @@ Projenin taşıyıcı görüntü katmanını oluşturan steganografi modülü (`
 * RSA modunda AES-256 anahtarı rastgele üretilir ve alıcının RSA genel anahtarıyla sarılır; AES modu Argon2id ile paroladan 256-bit anahtar türetir. Her iki modda header'daki `ct_len`, ciphertext ile 16 baytlık GCM tag'inin toplam uzunluğudur.
 * `extract` iki aşamalı header okuyucusuyla mod ve `k` değerini görüntüden alır; ayrıca `--bits` kabul etmez. AES modunda parola `getpass` ile istenir; RSA modunda `--privkey`/`--private-key` PEM anahtarı okunur ve şifreliyse anahtar parolası gizli olarak istenir. Header yeniden oluşturulup GCM AAD doğrulamasına verilir; plaintext `--output` dosyasına yazılır.
 * Argüman ayrıştırma, keygen, capacity, AES/RSA embed ve extract round-trip, yanlış parola ve özel anahtar akışları `tests/test_cli.py` içinde test edilir.
+
+## Testing
+
+Tüm test paketi tek komutla çalıştırıldı:
+
+```bash
+.venv/bin/pytest -v --tb=short
+```
+
+| Test adı / kapsamı | Beklenen | Gerçekleşen | Durum |
+|---|---|---|---|
+| `tests/test_cli.py` — CLI ayrıştırma, keygen/capacity, AES/RSA round-trip ve hata akışları | Tüm komut ve round-trip doğrulamaları geçmeli | 78 geçti, 0 kaldı | Geçti |
+| `tests/test_crypto.py` — AES-GCM, RSA, yanlış anahtar/parola, ciphertext/tag ve header bütünlüğü | Beklenen plaintext veya ilgili doğrulama hatası alınmalı | 11 geçti, 0 kaldı | Geçti |
+| `tests/test_stego_bits.py` — `k`-bit LSB gömme/çıkarma | Bitler korunmalı; geçersiz bitler reddedilmeli | 4 geçti, 0 kaldı | Geçti |
+| `tests/test_stego_capacity.py` — tam kapasite, kapasite aşımı ve geçersiz `k` | Tam sığan payload geri alınmalı; sınır aşımı reddedilmeli | 9 geçti, 0 kaldı | Geçti |
+| `tests/test_stego_corruption.py` — bozuk header, kesik kanal dizisi ve `ct_len` aşımı | Bozuk veya yetersiz veri hata vermeli | 6 geçti, 0 kaldı | Geçti |
+| `tests/test_stego_roundtrip.py` — farklı payload, `k`, boyut ve görsel modları | Gömülen veri ve header bilgileri aynen çıkarılmalı | 39 geçti, 0 kaldı | Geçti |
+| **Toplam** | **Tüm testler geçmeli** | **147 geçti, 0 kaldı** | **Geçti** |
