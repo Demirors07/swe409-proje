@@ -1,0 +1,146 @@
+PROJE DOSYALARININ AMACLARI
+==========================
+
+Bu belge, asagidaki Python modulu, test dosyalari ve pytest ayar dosyasinin
+projedeki sorumluluklarini aciklar.
+
+
+1. src/stego_module.py
+----------------------
+Goruntu tabanli steganografi uygulamasinin ana moduludur. Mesaj baytlarini
+PNG goruntulerinin RGB renk kanallarinin en dusuk anlamli bitlerine (LSB)
+gomer ve daha sonra geri cikarir.
+
+Modulun baslica gorevleri:
+- RGB/RGBA goruntulerini uint8 RGB dizilerine yuklemek ve PNG olarak kaydetmek.
+- Bayt dizilerini MSB-first bit dizilerine, bit dizilerini baytlara cevirmek.
+- Bir kanalin alt k bitine veri gommek ve bu bitleri cikarmak.
+- Header ve payload uzunluguna gore goruntu kapasitesini hesaplamak.
+- Header'i her zaman k=1 ile, payload'i header'da belirtilen k degeriyle
+  (desteklenen degerler 1, 2 veya 3) gommek.
+- AES/RSA modlari icin header alanlarini container modulundeki yardimcilarla
+  paketlemek ve cikarmak.
+- Kucuk kapasite, gecersiz giris veya kesik veri durumlarinda acik hata vermek.
+
+Bu modul steganografi katmanidir; payload'in sifrelenmesi crypto_module.py'nin
+sorumlulugundadir.
+
+
+2. tests/conftest.py
+--------------------
+pytest'in testlerde ortak kullanilan fixture'larini tanimlar.
+
+create_cover fixture'i, istenen genislik, yukseklik ve RGB/RGBA renk modunda,
+deterministik rastgele piksel verisine sahip bir test PNG'si olusturur. Bu,
+testlerin her birinde ayni goruntu olusturma kodunun tekrar edilmesini onler.
+
+
+3. tests/test_crypto.py
+-----------------------
+Kriptografi ve anahtar yonetimi davranislarini test eder:
+- AES-GCM sifreleme ve sifre cozmenin round-trip dogrulamasi.
+- Yanlis parola veya degistirilmis AAD ile kimlik dogrulama hatasi.
+- RSA ile AES anahtari sarma ve geri acma.
+- Bos mesaj ve gecersiz header imzasi gibi hata durumlari.
+- RSA anahtarlarinin PEM dosyalarina kaydedilip tekrar yuklenmesi.
+- Yanlis RSA ozel anahtariyla sarilmis anahtari acma hatasi.
+
+
+4. tests/test_stego_bits.py
+---------------------------
+Steganografi modulundeki dusuk seviyeli bit gomme/cikarma yardimcilarini
+yalitilmis sekilde test eder:
+- k=1, k=2 ve k=3 icin bitlerin dogru round-trip edilmesi.
+- Gomme isleminin kullanilmayan ust kanal bitlerini ve orijinal girdiyi
+  degistirmemesi.
+- 0 ve 1 disinda deger iceren bit dizisinin reddedilmesi.
+
+
+5. tests/test_stego_capacity.py
+-------------------------------
+Steganografi kapasite sinirlarini test eder:
+- Hesaplanan maksimum payload kapasitesinin tamamini kullanan verinin
+  basariyla gomulup aynen cikarilmasi.
+- Kapasiteden bir bayt fazla veride CapacityError alinmasi ve hata mesajinin
+  gerekli/mevcut bayt sayilarini icermesi.
+- RGB ve RGBA kaynak goruntulerinde kapasite sonucunun tutarli olmasi.
+
+
+6. tests/test_stego_corruption.py
+---------------------------------
+Bozuk veya eksik steganografi verisinin hata ile reddedilmesini test eder:
+- Magic, surum veya mod alanlarinin bozulmasi.
+- Header ya da payload kanallarinin kesilmesi.
+- Header'daki ct_len degerinin goruntu kapasitesini asmasi.
+
+
+7. tests/test_stego_roundtrip.py
+--------------------------------
+Steganografi API'sinin uc uca davranisini test eder:
+- Farkli kare/dikdortgen boyutlarinda, RGB ve RGBA girdilerinde round-trip.
+- AES ve RSA header modlari ile k=1, k=2 ve k=3 payload gommesi.
+- Rastgele payload, mode, k, nonce ve extra_data alanlarinin korunmasi.
+- Header'in gercekten k=1 ile gomuldugunun dogrudan kontrolu.
+- RGBA girisinin RGB'ye donusturulmesi ve seffaf alanlarin beyaz arka planla
+  birlestirilmesi.
+- Dosya ve RGB dizi girdileri icin kapasite hesabinin tutarliligi.
+
+
+8. pytest.ini
+-------------
+pytest yapilandirmasidir. Proje ana dizinini (.) ve src dizinini Python import
+yoluna ekler. Boylece testler proje kokunden calistirilirken hem src paket
+importlari hem de src altindaki modullerin dogrudan importlari cozulur.
+
+
+9. src/main.py
+--------------
+Uygulamanin komut satiri arguman ayrıştırıcısını tanımlar. argparse ile dört
+alt komut sunar:
+- keygen: RSA-2048 özel/genel anahtar çifti üretir ve PEM dosyalarına kaydeder.
+  İsteğe bağlı özel anahtar parolası terminalde gizli istenir ve doğrulanır;
+  özel anahtar dosyası yalnızca sahibi tarafından okunabilir şekilde kaydedilir.
+- embed: kapak görseli, mesaj dosyası, çıktı PNG'si, AES/RSA modu ve payload
+  için k değeri; AES modunda parola getpass ile gizli alınır, RSA modunda
+  --pubkey / --public-key ile genel PEM anahtarı belirtilir. Ciphertext ve
+  GCM tag'i, tam header AAD olarak kullanılarak üretilir ve steganografi
+  modülüyle PNG'ye gömülür.
+- extract: stego görseli ve çıkarılacak plaintext dosyası. Görsel header'ından
+  mod ve k otomatik okunur; AES modunda parola getpass ile, RSA modunda
+  --privkey / --private-key ile özel PEM anahtarı alınır. Header AAD olarak
+  doğrulanır, plaintext çıktı dosyasına yazılır.
+- capacity: görsel, AES/RSA header modu ve payload k değeri.
+
+build_parser() parser nesnesini, parse_args() ise argüman dizisini ayrıştırılmış
+Namespace olarak döndürür. keygen, capacity, embed ve extract akışları uygulanmıştır.
+capacity azami kapasiteyi, embed ise parolalı AES-GCM veya RSA hibrit şifreleme
+sonrası PNG'ye gömülmüş ciphertext'i üretir. extract görüntüdeki header'dan
+mod ve k değerini belirler, GCM doğrulamasıyla plaintext'i çözer ve çıktı
+dosyasına kaydeder.
+
+
+10. tests/test_cli.py
+---------------------
+CLI argüman ayrıştırmasını ve RSA keygen akışını test eder:
+- Dört alt komutun varlığı ve her komutun temel argümanları.
+- Varsayılan k değerinin 1 olması.
+- Desteklenmeyen k değeri ve eksik alt komutun reddedilmesi.
+- Anahtar çiftinin PEM olarak yazılması ve özel anahtar dosya izinlerinin
+  sınırlandırılması.
+- Özel anahtar parolasının gizli alınması, doğrulanması ve mevcut dosyaların
+  üzerine yazılmasının reddedilmesi.
+- AES/RSA modları ve 1, 2, 3 bit derinliklerinde capacity hesaplamasının
+  ekrana doğru yazdırılması.
+- AES ve RSA modlarında embed çıktısının AAD ile doğrulanarak çözülebilmesi,
+  boş mesajın reddedilmesi ve RSA public key argümanının zorunlu tutulması.
+- AES/RSA extract round-trip, yanlış parolada kimlik doğrulama hatası, RSA
+  private key parola akışı ve extract komutunda --bits argümanının
+  reddedilmesi.
+
+
+Testleri calistirma
+-------------------
+Proje sanal ortami etkinlestirildikten sonra tum testler su komutla
+calistirilabilir:
+
+    pytest

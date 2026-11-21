@@ -139,7 +139,46 @@ Sistem olası saldırılara ve hatalı kullanımlara karşı sıkı bir doğrula
 
 
 
+## Adım 4: Steganografi Katmanı Gerçekleşimi (Implementation → Steganographic Layer & Kapasite Analizi)[cite: 1, 2]
 
+Projenin taşıyıcı görüntü katmanını oluşturan steganografi modülü (`src/stego_module.py`), şifrelenmiş `payload` baytlarını ve header meta verilerini kayıpsız `PNG` görsellerinin `RGB` renk kanallarındaki en düşük anlamlı bitlere (`LSB`) vektörize olarak gömer ve geri çıkarır[cite: 1, 2]. Bu katman, şifreleme (`crypto_module.py`) ve paketleme/kapasite (`container.py`) katmanlarından ayrık çalışacak şekilde tasarlanmıştır[cite: 2].
 
+### 1. Girdi Dönüşümü, Bit Sırası ve Kayıpsız Kayıt
+* **Görsel Yükleme (`load_rgb_array`):** Girdi dosyası `Pillow` ile açılır; şeffaflık (`A` / `RGBA`) içeriyorsa `(255, 255, 255, 255)` beyaz zemin üzerinde `alpha_composite` ile birleştirilir ve bağımsız `(height, width, 3)` `uint8` `RGB` NumPy dizisine dönüştürülür[cite: 2].
+* **MSB-First Bit ↔ Bayt Dönüşümü (`bytes_to_bits_msb`, `bits_to_bytes_msb`):** Bayt dizileri `MSB-first` (`bitorder="big"`) sırasıyla `0/1` bit dizilerine açılır; `8` bit hizalı bit dizileri tekrar baytlara paketlenir[cite: 2].
+* **Kayıpsız PNG Kaydı (`save_rgb_png`):** Gömme işlemi sonrası çıktı uzantısı `.png` olacak şekilde normalize edilir ve `(H, W, 3)` `uint8` dizi kayıpsız `PNG` (`format="PNG", compress_level=6`) olarak kaydedilir[cite: 1, 2].
 
+### 2. Vektörize `k`-Bit LSB Gömme ve Çıkarma
+* **Gömme (`embed_kbits_lsb`):** `k` değeri gömme/çıkarma yardımcılarında `1..8` aralığında, wire/header formatında ise `1..3` aralığında doğrulanır. Hedef kanallardaki en düşük `k` bit maskelenerek temizlenir (`& (0xFF ^ mask)`) ve `MSB-first` bit gruplarıyla doldurulur[cite: 1, 2]. Son grupta eksik bit kalırsa sıfır ile doldurulur (`np.pad`) ve `inplace=False` iken orijinal dizi korunur[cite: 2].
+* **Çıkarma (`extract_kbits_lsb`):** İlgili kanal aralığından maskelenen `k` bitlik değerler `MSB-first` sırasıyla bitlere ayrıştırılır ve `[:n_bits]` ile istenen tam bit sayısına kırpılır[cite: 2].
 
+### 3. Hibrit `k` Gömme ve İki Aşamalı Header Okuma
+* **Gömme Akışı (`embed_message`):** `mode` (`0x01` için `40` bayt header / `16` bayt `extra_data`; `0x02` için `280` bayt header / `256` bayt `extra_data`), `12` bayt `nonce` ve `payload` tipi/uzunluğu doğrulanır; `ensure_capacity` ile kapasite kontrolü yapılır[cite: 2]. Header her zaman `k=1` ile başlangıçtan itibaren gömülür, ardından `payload` header'da belirtilen `k` (`1`, `2` veya `3`) değeriyle kaldığı kanal ofsetinden devam edilerek gömülür[cite: 1, 2].
+* **Çıkarma Akışı (`extract_stego_payload`, `extract_message_from_image`):** Önce `k=1` ile `HEADER_PREFIX_SIZE` (`8` bayt) önek çıkarılıp `unpack_header_prefix` ile `mode` ve `k` elde edilir[cite: 2]. Ardından `mode`'a göre kalan header baytları yine `k=1` ile okunup `unpack_header_rest` ile `nonce`, `payload_size` (`ct_len`) ve `extra_data` çözümlenir; son olarak `payload_size * 8` bit `k` derinliğiyle okunarak `(payload, mode, k, nonce, extra_data)` döndürülür[cite: 2].
+
+### 4. Kapasite Analizi ve Sınır Koşulları
+* Genişliği $W$, yüksekliği $H$ olan bir `RGB` görselde toplam kanal sayısı $W \times H \times 3$'tür[cite: 2]. Header her zaman $k=1$ ile gömüldüğünden `mode = 0x01` için `320` kanal (`40` bayt) ve `mode = 0x02` için `2240` kanal (`280` bayt) header'a ayrılır[cite: 2].
+* Maksimum payload kapasitesi (bayt cinsinden), `container.py` içindeki `calculate_max_payload_bytes` ile şu formüle göre hesaplanır[cite: 1, 2]:
+  $$\text{Capacity}_{\text{max}}(W, H, L_{\text{header}}, k) = \left\lfloor \frac{((W \times H \times 3) - (L_{\text{header}} \times 8)) \times k}{8} \right\rfloor$$
+* **Taşma Kontrolü (`ensure_capacity`, `CapacityError`):** Gerekli `payload` bayt sayısı mevcut kapasiteyi aştığında `CapacityError` fırlatılır ve hata mesajında hem gerekli (`required`) hem mevcut (`available`) bayt sayısı açıkça belirtilir[cite: 1, 2].
+* **Kapasite Yardımcıları (`capacity`, `calculate_capacity`):** `capacity(image, mode, k)` dosya yolu, `PIL.Image` veya `(H, W, 3)` `uint8` dizi girdileri için header payını düşerek net payload kapasitesini döndürür; `calculate_capacity(image_path, bits_per_pixel)` ise header düşülmemiş ham kanal kapasitesini (`W * H * 3 * bits_per_pixel // 8`) verir[cite: 2].
+
+### 5. Doğrulama, Test Senaryoları ve Modül Çıktısı
+* `pytest.ini` (`pythonpath = . src`) yapılandırması altında steganografi modülü bit seviyesi, kapasite sınırları, bozuk/eksik girdi ve uçtan uca `round-trip` testleriyle doğrulanmıştır[cite: 1, 2].
+* Kapsanan temel test senaryoları[cite: 1, 2]:
+  * Rastgele `payload`, `mode` (`0x01` / `0x02`), `k` (`1`, `2`, `3`), `nonce` ve `extra_data` alanlarının farklı boyutlarda ve `RGB`/`RGBA` girdilerde birebir korunması (`round-trip`)[cite: 1, 2].
+  * Eksik kalan son `k` bit grubunun sıfırla doldurulması, kullanılmayan üst bitlerin ve `inplace=False` iken orijinal dizinin değişmemesi ile `0/1` dışı bitlerin reddedilmesi[cite: 2].
+  * Maksimum kapasiteye tam eşit veride başarı; `max + 1` baytta gerekli ve mevcut bayt sayılarını içeren `CapacityError` fırlatılması[cite: 1, 2].
+  * Bozuk `magic`/header öneki, kesik/eksik kanal dizisi ve kapasiteyi aşan `ct_len` değerlerinde hata üretilmesi[cite: 1, 2].
+* Modül belirlenen kapasite sınırlarına uygun şekilde veri gömüp birebir geri çıkarmakta ve tüm birim testlerini başarıyla geçmektedir[cite: 1, 2].
+
+## Adım 5: CLI İskeleti ve Argüman Ayrıştırıcı
+* `src/main.py`, `argparse` ile `keygen`, `embed`, `extract` ve `capacity` alt komutlarını tanımlar.
+* Alt komutların dosya yolları, şifreleme modu, payload `k` değeri ve RSA anahtar yolları gibi temel argümanları ayrıştırılır; parola komut satırında verilmez, gerektiğinde `getpass` ile etkileşimli ve gizli biçimde alınır.
+* `keygen` komutu RSA-2048 anahtar çifti üretir; PEM dosyalarını kaydeder, mevcut dosyaların üzerine yazmayı reddeder ve özel anahtar dosyasını `0600` izinleriyle sınırlar.
+* `--protect-private-key` seçeneğinde parola terminalden gizli biçimde iki kez alınır ve eşleşmesi doğrulanır; parola komut satırı argümanı olarak kullanılmaz.
+* `capacity IMAGE --mode {aes,rsa} --bits {1,2,3}` görsel ve header moduna göre şifreli payload kapasitesini hesaplayıp bayt cinsinden yazdırır; ayrıca AES-GCM tag'i için 16 bayt düşerek plaintext mesaj kapasitesini bildirir.
+* `embed` boş olmayan dosya içeriğini alır; AES modunda parolayı `getpass` ile gizli ister, RSA modunda `--pubkey`/`--public-key` PEM anahtarını okur. AES-GCM ciphertext ve tag, `container.pack_header` ile oluşturulan tam header'ı AAD kullanarak üretilir ve `stego_module.embed_message` ile PNG'ye gömülür.
+* RSA modunda AES-256 anahtarı rastgele üretilir ve alıcının RSA genel anahtarıyla sarılır; AES modu Argon2id ile paroladan 256-bit anahtar türetir. Her iki modda header'daki `ct_len`, ciphertext ile 16 baytlık GCM tag'inin toplam uzunluğudur.
+* `extract` iki aşamalı header okuyucusuyla mod ve `k` değerini görüntüden alır; ayrıca `--bits` kabul etmez. AES modunda parola `getpass` ile istenir; RSA modunda `--privkey`/`--private-key` PEM anahtarı okunur ve şifreliyse anahtar parolası gizli olarak istenir. Header yeniden oluşturulup GCM AAD doğrulamasına verilir; plaintext `--output` dosyasına yazılır.
+* Argüman ayrıştırma, keygen, capacity, AES/RSA embed ve extract round-trip, yanlış parola ve özel anahtar akışları `tests/test_cli.py` içinde test edilir.

@@ -38,10 +38,26 @@ def encrypt_aes_gcm(plaintext: bytes, password: str, aad: bytes = None) -> tuple
     salt = os.urandom(16)
     nonce = os.urandom(12)
     key = derive_key(password, salt)
-    
-    aesgcm = AESGCM(key)
-    ciphertext_and_tag = aesgcm.encrypt(nonce, plaintext, aad)
+
+    ciphertext_and_tag = encrypt_aes_gcm_with_key(plaintext, key, nonce, aad)
     return ciphertext_and_tag, nonce, salt
+
+
+def encrypt_aes_gcm_with_key(
+    plaintext: bytes,
+    key: bytes,
+    nonce: bytes,
+    aad: bytes = None,
+) -> bytes:
+    """Encrypt non-empty plaintext with a supplied AES-256 key and 12-byte nonce."""
+    validate_plaintext(plaintext)
+    if len(key) != 32:
+        raise ValueError("AES-256 key must contain exactly 32 bytes.")
+    if len(nonce) != 12:
+        raise ValueError("AES-GCM nonce must contain exactly 12 bytes.")
+
+    aesgcm = AESGCM(key)
+    return aesgcm.encrypt(nonce, plaintext, aad)
 
 
 def decrypt_aes_gcm(ciphertext_and_tag: bytes, password: str, nonce: bytes, salt: bytes, aad: bytes = None) -> bytes:
@@ -52,6 +68,20 @@ def decrypt_aes_gcm(ciphertext_and_tag: bytes, password: str, nonce: bytes, salt
     key = derive_key(password, salt)
     aesgcm = AESGCM(key)
     return aesgcm.decrypt(nonce, ciphertext_and_tag, aad)
+
+
+def decrypt_aes_gcm_with_key(
+    ciphertext_and_tag: bytes,
+    key: bytes,
+    nonce: bytes,
+    aad: bytes = None,
+) -> bytes:
+    """Decrypt and authenticate AES-GCM data using a supplied AES-256 key."""
+    if len(key) != 32:
+        raise ValueError("AES-256 key must contain exactly 32 bytes.")
+    if len(nonce) != 12:
+        raise ValueError("AES-GCM nonce must contain exactly 12 bytes.")
+    return AESGCM(key).decrypt(nonce, ciphertext_and_tag, aad)
 
 
 def generate_rsa_keys():
