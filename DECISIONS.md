@@ -126,6 +126,16 @@ Sistem olası saldırılara ve hatalı kullanımlara karşı sıkı bir doğrula
 * **Header ve Bütünlük Doğrulamaları:** Header çözme aşamasında `magic` (`b"STG1"`), desteklenmeyen sürüm, geçersiz mod veya hatalı `ct_len` değerleri anında yakalanarak `ValueError` fırlatılır.
 * **Boş Mesaj Koruması:** Şifrelenecek veya gizlenecek verinin boş olması durumunda açık bir hata fırlatılması için `EmptyMessageError` mekanizması entegre edilmiştir.
 
+### 6. Doğrulama, Test Senaryoları ve Modül Çıktısı
+* Kriptografik modül, görüntü taşıyıcı katmanından bağımsız olarak `pytest` ile uçtan uca test edilmiştir[cite: 1].
+* Kapsanan temel test senaryoları[cite: 1]:
+  * Parola ve RSA modları için şifreleme-çözme gidiş-dönüş (`round-trip`) doğrulaması[cite: 1].
+  * Yanlış parola ve yanlış RSA özel anahtarı ile çözme denemelerinde beklenen hataların alınması[cite: 1].
+  * Ciphertext üzerinde tek bit değişikliği ve kimlik doğrulama etiketi (`tag`) bozulmalarında `InvalidTag` hatası üretilmesi[cite: 1].
+  * Header alanında yapılan değişikliklerde AAD bütünlük doğrulaması sayesinde kimlik doğrulama hatası alınması[cite: 1].
+  * Geçersiz `magic` imzası ve boş mesaj girişlerinde açık hata (`ValueError` / `EmptyMessageError`) fırlatılması[cite: 1].
+* Modül resim bağımlılığı olmadan çalışmakta ve tüm birim testlerini başarıyla geçmektedir[cite: 1].
+
 
 
 
