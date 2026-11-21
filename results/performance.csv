@@ -1,0 +1,11 @@
+operation,mean_ms,sample_stddev_ms,notes
+Argon2id KDF,106.759,11.458,Separate from AES-GCM
+RSA-2048 key generation,30.911,23.998,Fresh key pair per repetition
+RSA-OAEP-SHA256 wrap,0.020,0.002,Wrap one 32-byte AES key
+RSA-OAEP-SHA256 unwrap,0.452,0.069,Unwrap one 32-byte AES key
+AES-256-GCM encrypt,0.038,0.014,64 KiB plaintext; KDF excluded
+AES-256-GCM decrypt,0.032,0.002,64 KiB plaintext; KDF excluded
+Stego embed AES header,41.230,0.790,65552-byte payload; PNG I/O included
+Stego extract AES header,6.431,0.298,65552-byte payload
+Stego embed RSA header,41.148,0.546,65552-byte payload; PNG I/O included
+Stego extract RSA header,6.628,0.449,65552-byte payload

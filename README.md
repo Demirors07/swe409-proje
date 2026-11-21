@@ -106,3 +106,12 @@ python src/main.py extract results/secret.png \
 the passphrase is requested interactively. Extracted plaintext is written to
 the requested output file; a wrong passphrase/key or altered authenticated
 data causes an authentication error.
+
+## Experiment results
+
+Experiment datasets and figures are stored under `results/`. The detailed
+methodology, tables, and interpretation notes are in
+[`EXPERIMENT_RESULTS.md`](EXPERIMENT_RESULTS.md); the CSV files provide
+machine-readable copies of the capacity matrix, visual-quality metrics,
+steganalysis, performance, robustness, and security results. Each table and
+figure also has a short interpretation note in [`DECISIONS.md`](DECISIONS.md).

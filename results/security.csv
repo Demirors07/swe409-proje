@@ -1,0 +1,7 @@
+case,expected,observed,result
+"Correct key, ciphertext, and header",Plaintext authenticates and matches original,Decryption succeeded; exact plaintext recovered,PASS
+Wrong password-derived key,Authentication failure,InvalidTag; no plaintext returned,PASS
+Single-bit ciphertext modification,Authentication failure,InvalidTag; no plaintext returned,PASS
+Single-bit GCM tag modification,Authentication failure,InvalidTag; no plaintext returned,PASS
+Header/AAD modification,Authentication failure,InvalidTag; no plaintext returned,PASS
+Invalid magic prefix BAD1,Header validation failure,ValueError; invalid magic rejected,PASS

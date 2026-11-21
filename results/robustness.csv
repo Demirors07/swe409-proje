@@ -1,0 +1,9 @@
+transformation,header_ber_percent,header_bit_errors,header_bits,header_parse,ciphertext_tag_ber_percent,payload_bit_errors,payload_bits,gcm_tag_verification
+Clean PNG control,0.0000,0,320,Valid,0.0000,0,524416,PASS
+JPEG quality 95,47.1875,151,320,Rejected ValueError,49.9781,262093,524416,N/A header rejected
+JPEG quality 75,50.6250,162,320,Rejected ValueError,50.1016,262741,524416,N/A header rejected
+JPEG quality 50,51.8750,166,320,Rejected ValueError,50.0782,262618,524416,N/A header rejected
+Resize 50 percent down/up,50.6250,162,320,Rejected ValueError,50.0339,262386,524416,N/A header rejected
+Gaussian noise sigma 1,49.3750,158,320,Rejected ValueError,49.3311,258700,524416,N/A header rejected
+Gaussian noise sigma 3,50.6250,162,320,Rejected ValueError,50.0263,262346,524416,N/A header rejected
+Gaussian noise sigma 5,51.5625,165,320,Rejected ValueError,49.9333,261858,524416,N/A header rejected

@@ -200,3 +200,42 @@ Tüm test paketi tek komutla çalıştırıldı:
 | `tests/test_stego_corruption.py` — bozuk header, kesik kanal dizisi ve `ct_len` aşımı | Bozuk veya yetersiz veri hata vermeli | 6 geçti, 0 kaldı | Geçti |
 | `tests/test_stego_roundtrip.py` — farklı payload, `k`, boyut ve görsel modları | Gömülen veri ve header bilgileri aynen çıkarılmalı | 39 geçti, 0 kaldı | Geçti |
 | **Toplam** | **Tüm testler geçmeli** | **147 geçti, 0 kaldı** | **Geçti** |
+
+## Adım 7: Deney Sonuçları ve Yorum Notları
+
+Deneylerin makinece okunabilir tabloları ve grafik çıktıları `results/` altında
+toplandı. Aşağıdaki notlar her CSV, rapor tablosu ve grafik çıktısının bulgusunu
+ve yorum sınırını kaydeder.
+
+### CSV dosyaları
+
+- **`results/experiment_matrix.csv`:** Üç örnek görsel, AES/RSA, `k=1/2/3` ve `%10/%50/%100` doluluk kombinasyonları için kapasite ve payload boyutlarını içerir. 54 kombinasyonun tamamı round-trip doğrulamasını geçti.
+- **`results/visual_quality.csv`:** Tam kapasite rastgele payload için MSE, PSNR ve SSIM ölçümlerini teorik referanslarla birlikte kaydeder. Textured örnek teoriye yakınken mixed örnekte düz renk bölgeleri nedeniyle özellikle yüksek `k` değerlerinde kalite düşüşü belirgindir.
+- **`results/steganalysis_chi_square.csv`:** Her RGB kanalı ve `k` değeri için cover/stego chi-square p-değerlerini ve farklarını saklar. P-değeri değişimleri cover içeriğine göre değiştiğinden tek başına güvenilir bir steganaliz kararı olarak yorumlanmamalıdır.
+- **`results/performance.csv`:** On tekrarlı performans ölçümlerinin ortalama ve örnek standart sapmasını milisaniye olarak içerir. Argon2id KDF, AES-GCM’den ayrı raporlanarak algoritma kıyasının KDF maliyetiyle karışması önlenmiştir.
+- **`results/robustness.csv`:** JPEG, resize ve Gaussian gürültü koşullarındaki header/payload BER ile header ve GCM sonuçlarını kaydeder. Kayıplı dönüşümlerin tümü header’ı bozmuş ve payload BER yaklaşık `%50` olmuştur.
+- **`results/security.csv`:** Doğru anahtarla başarılı kontrolü ve yanlış parola, ciphertext/tag tamperi, AAD değişikliği ve geçersiz magic negatif kontrollerini özetler. Tüm saldırı girdileri beklenen doğrulama hatalarıyla reddedilmiştir.
+
+### `EXPERIMENT_RESULTS.md` tabloları
+
+- **Deney matrisi tablosu:** Görsel sınıfı, mod, `k` ve doluluk oranı boyutlarında test kapsamını ve kapasiteyi karşılaştırır. Tam kapasite dâhil bütün hücrelerde geri alınan veri özgün payload ile eşleşmiştir.
+- **7.1 MSE/PSNR/SSIM tablosu:** Ölçülen görsel kalite metriklerini teorik MSE/PSNR referanslarıyla karşılaştırır. Sonuçların özellikle düz renkli mixed alanlarda teorik varsayımdan ayrılması, cover içeriğinin etkisini gösterir.
+- **7.2 RGB p-değeri tablosu:** Her örnek ve renk kanalı için stego p-değerlerini ve cover’a göre değişimi verir. Değişimler `k` ile monoton artmadığından ve örnekler arasında farklılaştığından tablo tanısal bulgu olarak değerlendirilmelidir.
+- **7.3 Performans tablosu:** KDF, RSA, AES-GCM ve stego aşamalarının 10 ölçümden hesaplanan ortalama ± standart sapmasını gösterir. KDF hariç AES-GCM kısa sürerken stego sürelerine PNG okuma/yazma dâhildir.
+- **7.4 Dayanıklılık tablosu:** Görsel dönüşümlerinin header ve ciphertext/tag bit hata oranlarını, parse ve tag sonuçlarını yan yana verir. JPEG, yeniden boyutlandırma ve gürültü LSB verisini bozduğundan taşıyıcıların kayıpsız PNG olarak korunması gerekir.
+- **7.5 Güvenlik tablosu:** Beklenen ve gözlenen sonuçları doğrulama senaryosu bazında listeler. Doğru veri kabul edilmiş; yanlış parola, tamper ve magic bozulması plaintext üretmeden reddedilmiştir.
+
+### Kalite grafikleri
+
+- **`results/quality_experiment_smooth.png`:** 256×256 smooth görselin orijinalini, her `k` için stego sürümünü ve kontrastı artırılmış fark haritasını gösterir. Farklar `k` arttıkça daha görünür hale gelir ve SSIM’deki düşüşle uyumludur.
+- **`results/quality_experiment_textured.png`:** 512×512 textured görselde orijinal, stego ve fark haritalarını karşılaştırır. Gürültülü kapak görselinde değişiklikler görsel dokunun içinde daha az seçilir ve ölçülen MSE teorik referanslara yakındır.
+- **`results/quality_experiment_mixed.png`:** 512×512 geometrik/karma görselde aynı üçlü karşılaştırmayı sunar. Büyük düz renk alanlarındaki LSB değişimleri yüksek `k` seviyelerinde daha belirgin kalite kaybına yol açar.
+
+### Steganaliz grafikleri
+
+- **`results/steganalysis_histogram_smooth.png`:** Smooth örneğin R/G/B histogramlarını orijinal ve `k=1/2/3` stego sürümleri için karşılaştırır. Gömme sonrasında yoğunluk dağılımı değişebilir; histogram tek başına payload’ın varlığını veya oranını kanıtlamaz.
+- **`results/steganalysis_histogram_textured.png`:** Textured örneğin renk kanalı histogramlarının stego öncesi ve sonrası dağılımını gösterir. Başlangıçtaki gürültülü dağılım değişiklikleri maskeleyebilir ve bu gözlem yalnızca bu örnek görsel için geçerlidir.
+- **`results/steganalysis_histogram_mixed.png`:** Mixed örneğin RGB histogramlarındaki orijinal ve stego dağılımlarını karşılaştırır. Düz renk bölgelerinin yoğun değerleri p-değeri değişimini büyütebilir; sonuçlar farklı görsel sınıflarına genellenmemelidir.
+- **`results/steganalysis_lsb_smooth.png`:** Smooth görsel için orijinal ve stego R/G/B kanallarının 0–2 bit düzlemlerini gösterir. Veri gömülen düzlemler rastgeleleşme eğilimi gösterirken, özgün gradient yapısı cover’ın kendi LSB örüntüsünü ortaya koyar.
+- **`results/steganalysis_lsb_textured.png`:** Textured örnekte üç düşük bit düzlemini, renk kanalları ve `k` seviyeleri boyunca yan yana sunar. Özgün dokunun zaten gürültülü LSB’leri nedeniyle stego değişiklikleri yalnızca görsel incelemeyle güvenilir biçimde ayırt edilemez.
+- **`results/steganalysis_lsb_mixed.png`:** Mixed örnekte orijinal ve stego düşük bit düzlemlerini kanal bazında karşılaştırır. Düz bölgelerde özgün yapıdan rastgele görünüme geçiş belirgin olsa da bu, sınırlı örnek üzerinde nitel bir gözlemdir.
