@@ -17,15 +17,11 @@ tarih + gerekçe ile eklenir.
 
 ### Git / GitHub
 - Yerel klasör: `swe409-proje`
-- GitHub repo: `Demirors07/swe409-proje` (private)
+- GitHub repo: `Demirors07/swe409-proje` (public)
 - Branch: `main`
-- Git kimliği: user.name = `karne07`, user.email = `d3mirors.07@gmail.com`
-- Commit dili: ilk commit Türkçe; bundan sonrakiler İngilizce
-- Commit mesajı formatı: `Step X: kısa açıklama`
 - .gitignore kapsamı: `__pycache__/`, `*.py[cod]`, `.venv/`, `venv/`,
   `*.pem`, `*.key`, `.env`, `.DS_Store`, `results/tmp/`
 - Temiz teslim kopyası: `git archive --format=zip -o swe409-teslim.zip HEAD`
-- Lisans: eklenmeyecek (private repo)
 
 ### Proje / rapor
 - Rapor dili: İngilizce
